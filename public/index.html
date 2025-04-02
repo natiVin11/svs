@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>לוח שנה - עורך דין</title>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    body { font-family: 'Arial', sans-serif; direction: rtl; text-align: center; background: linear-gradient(135deg, #e3f2fd, #bbdefb); margin: 0; padding: 0; }
+    h1 { background: #007bff; color: white; padding: 20px; margin: 0; font-size: 24px; }
+    #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); z-index: 1000; }
+    #close-modal { position: absolute; top: 10px; left: 10px; cursor: pointer; font-size: 20px; color: red; }
+    #calendar { max-width: 900px; margin: 20px auto; background: white; padding: 20px; border-radius: 10px; }
+    .holiday { background-color: rgba(255, 0, 0, 0.2) !important; color: red; font-weight: bold; }
+    #add-meeting-btn { margin-top: 20px; padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+<h1>לוח שנה - עורך דין</h1>
+
+<button id="add-meeting-btn">➕ הוסף פגישה</button>
+
+<div id="modal">
+  <span id="close-modal">❌</span>
+  <h2>📝 הוסף/ערוך פגישה</h2>
+  <label>שם מלא: <input type="text" id="full-name"></label><br>
+  <label>טלפון: <input type="text" id="phone"></label><br>
+  <label>גוש: <input type="text" id="gush"></label><br>
+  <label>חלקה: <input type="text" id="cheleka"></label><br>
+  <label>תת חלקה: <input type="text" id="sub-cheleka"></label><br>
+  <label>מייל: <input type="email" id="email"></label><br>
+  <label>תאריך ושעה: <input type="datetime-local" id="datetime"></label><br>
+  <button onclick="saveMeeting()">✅ שמור</button>
+</div>
+
+<div id="calendar"></div>
+
+<script>
+  let meetings = [];
+  let holidays = [];
+  let calendar;
+  let editingMeeting = null;  // משתנה לאחסון פגישה לעריכה
+
+  async function fetchMeetings() {
+    try {
+      const response = await fetch("http://localhost:3100/newP.json");
+      meetings = response.ok ? await response.json() : [];
+    } catch (error) {
+      console.error("❌ שגיאה בטעינת הפגישות:", error);
+    }
+  }
+
+  async function fetchHolidays() {
+    try {
+      const response = await fetch("/holidays");
+      if (!response.ok) {
+        console.error("❌ שגיאה בטעינת החגים: התגובה לא תקינה");
+        return [];  // אם התגובה לא תקינה, נחזיר מערך ריק
+      }
+      const data = await response.json();
+      return Array.isArray(data.holidays) ? data.holidays : [];  // לוודא שהנתונים מכילים את החגים
+    } catch (error) {
+      console.error("❌ שגיאה בטעינת החגים:", error);
+      return [];  // במקרה של שגיאה, נחזיר מערך ריק
+    }
+  }
+
+  async function renderCalendar() {
+    await fetchMeetings();
+    holidays = await fetchHolidays();
+
+    let calendarEl = document.getElementById("calendar");
+    calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: "dayGridMonth",
+      locale: "he",
+      selectable: true,
+      events: [
+        ...meetings,
+        ...holidays.flatMap(h => {
+          const startDate = new Date(h.start);
+          const endDate = new Date(h.end);
+          const events = [];
+          // עבור כל חג עם טווח תאריכים
+          let currentDate = new Date(startDate);
+          while (currentDate <= endDate) {
+            events.push({
+              title: h.name || "חג",  // אם אין שם לחג, נשתמש ב" חג"
+              start: currentDate.toISOString().split('T')[0],  // התאריך של החג
+              className: 'holiday'
+            });
+            currentDate.setDate(currentDate.getDate() + 1);  // עבור לתאריך הבא בטווח
+          }
+          return events;
+        })
+      ],
+      dateClick: function(info) {
+        const isHoliday = holidays.some(h => {
+          const start = new Date(h.start);
+          const end = new Date(h.end);
+          const selectedDate = new Date(info.dateStr);
+          return selectedDate >= start && selectedDate <= end;
+        });
+
+        if (isHoliday) {
+          alert("לא ניתן לקבוע פגישה בתאריך זה, זהו חג.");
+          return;
+        }
+        document.getElementById("datetime").value = info.dateStr + "T09:00";
+        document.getElementById("modal").style.display = "block";
+        editingMeeting = null;  // ביטול עריכת פגישה ישנה
+      },
+      eventClick: function(info) {
+        const meeting = info.event;
+        const eventData = meeting.extendedProps;
+
+        // הצגת המידע בפופאפ לעריכה
+        document.getElementById("full-name").value = eventData.title.split(' - ')[0];
+        document.getElementById("phone").value = eventData.phone;
+        document.getElementById("gush").value = eventData.gush;
+        document.getElementById("cheleka").value = eventData.cheleka;
+        document.getElementById("sub-cheleka").value = eventData.subCheleka;
+        document.getElementById("email").value = eventData.email;
+        document.getElementById("datetime").value = meeting.startStr;
+
+        // שינוי מצב לעריכת פגישה
+        editingMeeting = meeting;
+        document.getElementById("modal").style.display = "block";
+      }
+    });
+    calendar.render();
+  }
+
+  async function saveMeetingsToFile() {
+    try {
+      const response = await fetch("http://localhost:3100/save-meetings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(meetings)
+      });
+      if (!response.ok) throw new Error("❌ שגיאה בשמירת הפגישות");
+      console.log("✅ הפגישות נשמרו בהצלחה");
+    } catch (error) {
+      console.error("❌ שגיאה בשמירת הפגישות:", error);
+    }
+  }
+
+  function saveMeeting() {
+    let fullName = document.getElementById("full-name").value;
+    let phone = document.getElementById("phone").value;
+    let gush = document.getElementById("gush").value;
+    let cheleka = document.getElementById("cheleka").value;
+    let subCheleka = document.getElementById("sub-cheleka").value;
+    let email = document.getElementById("email").value;
+    let datetime = document.getElementById("datetime").value;
+
+    // בדיקה אם התאריך נופל על חג
+    const isHoliday = holidays.some(h => {
+      const start = new Date(h.start);
+      const end = new Date(h.end);
+      const selectedDate = new Date(datetime);
+      return selectedDate >= start && selectedDate <= end;
+    });
+
+    if (isHoliday) {
+      alert("לא ניתן לקבוע פגישה בתאריך זה, זהו חג.");
+      return;
+    }
+
+    // בדיקה אם הפגישה היא לפני 9:00 או אחרי 20:00
+    const selectedTime = new Date(datetime);
+    if (selectedTime.getHours() < 9 || selectedTime.getHours() > 20) {
+      alert("לא ניתן לקבוע פגישה לפני 9:00 או אחרי 20:00");
+      return;
+    }
+
+    // בדיקה אם הפגישה קרובה מדי לפגישה קודמת
+    const lastMeeting = meetings[meetings.length - 1];
+    if (lastMeeting && new Date(datetime) - new Date(lastMeeting.start) < 30 * 60 * 1000) {
+      alert("הפגישה צריכה להיות לפחות חצי שעה מהפגישה הקודמת");
+      return;
+    }
+
+    const meetingData = {
+      title: fullName + " - פגישה",
+      start: datetime,
+      description: `טלפון: ${phone}, גוש: ${gush}, חלקה: ${cheleka}, תת חלקה: ${subCheleka}, מייל: ${email}`,
+      phone,
+      gush,
+      cheleka,
+      subCheleka,
+      email
+    };
+
+    if (editingMeeting) {
+      // אם מדובר בעריכה, נעדכן את הפגישה הקיימת
+      editingMeeting.setProp('title', fullName + " - פגישה");
+      editingMeeting.setStart(datetime);
+      editingMeeting.setExtendedProp('phone', phone);
+      editingMeeting.setExtendedProp('gush', gush);
+      editingMeeting.setExtendedProp('cheleka', cheleka);
+      editingMeeting.setExtendedProp('subCheleka', subCheleka);
+      editingMeeting.setExtendedProp('email', email);
+      editingMeeting.setExtendedProp('description', `טלפון: ${phone}, גוש: ${gush}, חלקה: ${cheleka}, תת חלקה: ${subCheleka}, מייל: ${email}`);
+    } else {
+      // אם מדובר בהוספה חדשה, ניצור פגישה חדשה
+      meetings.push(meetingData);
+      calendar.addEvent(meetingData);
+    }
+
+    saveMeetingsToFile();
+    document.getElementById("modal").style.display = "none";
+  }
+
+  // סגירת חלון הפופאפ
+  document.getElementById("close-modal").addEventListener("click", () => {
+    document.getElementById("modal").style.display = "none";
+  });
+
+  // אתחול הלוח שנה
+  renderCalendar();
+</script>
+</body>
+</html>
