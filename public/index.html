@@ -122,7 +122,7 @@
 
     async function fetchMeetings() {
       try {
-        const response = await fetch("http://localhost:3100/newP.json");
+        const response = await fetch("/newP.json");
         meetings = response.ok ? await response.json() : [];
       } catch (error) {
         console.error("❌ שגיאה בטעינת הפגישות:", error);
@@ -211,7 +211,7 @@
 
     async function saveMeetingsToFile() {
       try {
-        const response = await fetch("http://localhost:3100/save-meetings", {
+        const response = await fetch('/save-meetings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(meetings)
