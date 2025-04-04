@@ -1,59 +1,54 @@
-const express = require('express');
-const fs = require('fs').promises;
-const path = require('path');
-const cors = require('cors');
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const cors = require("cors");
 
 const app = express();
-const PORT = process.env.PORT || 3100;
+const PORT = 3100;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public')); // מאפשר גישה לקבצים סטטיים
 
-// ROOT - מציג את index.html
-app.get('/', (req, res) => {
-    res.sendFile(path.resolve(__dirname, 'public', 'index.html'));
-});
+// נתיב לקובץ הפגישות
+const meetingsFile = path.join(__dirname, "newP.json");
+
+// נתיב לקובץ החגים
+const holidaysFile = path.join(__dirname, "holidays.json");
 
 // שליפת פגישות
-app.get('/newP.json', async (req, res) => {
-    try {
-        const filePath = path.join(__dirname, 'public', 'newP.json');
-        const data = await fs.readFile(filePath, 'utf8');
-        res.json(JSON.parse(data));
-    } catch (error) {
-        console.error('❌ שגיאה בשליפת הפגישות:', error);
-        res.status(500).json([]);
+app.get("/newP.json", (req, res) => {
+  fs.readFile(meetingsFile, "utf8", (err, data) => {
+    if (err) {
+      console.error("שגיאה בקריאת הקובץ:", err);
+      return res.status(500).send("שגיאה בשרת");
     }
+    res.send(JSON.parse(data));
+  });
 });
 
 // שליפת חגים
-app.get('/holidays', async (req, res) => {
-    try {
-        const filePath = path.join(__dirname, 'public', '12.json');
-        const data = await fs.readFile(filePath, 'utf8');
-        res.json(JSON.parse(data));
-    } catch (error) {
-        console.error('❌ שגיאה בשליפת החגים:', error);
-        res.status(500).json([]);
+app.get("/holidays", (req, res) => {
+  fs.readFile(holidaysFile, "utf8", (err, data) => {
+    if (err) {
+      console.error("שגיאה בקריאת קובץ החגים:", err);
+      return res.status(500).send("שגיאה בשרת");
     }
+    res.send(JSON.parse(data));
+  });
 });
 
 // שמירת פגישות
-app.post('/save-meetings', async (req, res) => {
-    try {
-        const filePath = path.join(__dirname, 'public', 'newP.json');
-        await fs.writeFile(filePath, JSON.stringify(req.body, null, 2));
-        res.json({ message: '✅ הפגישות נשמרו בהצלחה' });
-    } catch (error) {
-        console.error('❌ שגיאה בשמירת הפגישות:', error);
-        res.status(500).json({ message: '❌ שגיאה בשמירה' });
+app.post("/save-meetings", (req, res) => {
+  const meetings = req.body;
+  fs.writeFile(meetingsFile, JSON.stringify(meetings, null, 2), "utf8", (err) => {
+    if (err) {
+      console.error("שגיאה בשמירת הקובץ:", err);
+      return res.status(500).send("שגיאה בשמירה");
     }
+    res.send({ message: "הפגישות נשמרו בהצלחה" });
+  });
 });
 
-// favicon
-app.get('/favicon.ico', (req, res) => res.status(204));
-
 app.listen(PORT, () => {
-    console.log(`🚀 השרת רץ על http://localhost:${PORT}`);
+  console.log(`✅ השרת רץ על http://localhost:${PORT}`);
 });
