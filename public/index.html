@@ -132,7 +132,7 @@
 
     async function fetchHolidays() {
       try {
-        const response = await fetch("/holidays");
+        const response = await fetch("/pablic/12.json");
         if (!response.ok) {
           console.error("❌ שגיאה בטעינת החגים: תגובה לא תקינה");
           return [];
