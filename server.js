@@ -4,22 +4,21 @@ const path = require('path');
 const cors = require('cors');
 
 const app = express();
-const PORT = 3100;
+const PORT = process.env.PORT || 3100;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public')); // מוודא גישה לקבצים סטטיים
+app.use(express.static('public')); // מאפשר גישה לקבצים סטטיים
 
-// הצגת קובץ ה-HTML כאשר משתמש פונה ל-root ("/")
+// ROOT - מציג את index.html
 app.get('/', (req, res) => {
-    res.sendFile(path.resolve(__dirname,'public', 'index.html'));
+    res.sendFile(path.resolve(__dirname, 'public', 'index.html'));
 });
 
-
-// ✅ שליפת הפגישות
+// שליפת פגישות
 app.get('/newP.json', async (req, res) => {
     try {
-        const filePath = path.join(__dirname, 'newP.json');
+        const filePath = path.join(__dirname, 'public', 'newP.json');
         const data = await fs.readFile(filePath, 'utf8');
         res.json(JSON.parse(data));
     } catch (error) {
@@ -28,10 +27,10 @@ app.get('/newP.json', async (req, res) => {
     }
 });
 
-// ✅ שליפת החגים
+// שליפת חגים
 app.get('/holidays', async (req, res) => {
     try {
-        const filePath = path.join(__dirname, '12.json');
+        const filePath = path.join(__dirname, 'public', '12.json');
         const data = await fs.readFile(filePath, 'utf8');
         res.json(JSON.parse(data));
     } catch (error) {
@@ -40,10 +39,10 @@ app.get('/holidays', async (req, res) => {
     }
 });
 
-// ✅ שמירת הפגישות
+// שמירת פגישות
 app.post('/save-meetings', async (req, res) => {
     try {
-        const filePath = path.join(__dirname, 'newP.json');
+        const filePath = path.join(__dirname, 'public', 'newP.json');
         await fs.writeFile(filePath, JSON.stringify(req.body, null, 2));
         res.json({ message: '✅ הפגישות נשמרו בהצלחה' });
     } catch (error) {
@@ -52,7 +51,7 @@ app.post('/save-meetings', async (req, res) => {
     }
 });
 
-// ✅ favicon - למניעת שגיאה 404
+// favicon
 app.get('/favicon.ico', (req, res) => res.status(204));
 
 app.listen(PORT, () => {
